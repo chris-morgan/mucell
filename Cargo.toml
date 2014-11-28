@@ -7,5 +7,5 @@ description = "A cell with the ability to mutate the value through an immutable 
 #homepage = 
 repository = "https://github.com/chris-morgan/mucell"
 readme = "README.md"
-keywords = ["cell", "container", "data structure"]
+keywords = ["cell", "container", "data-structure"]
 license = "MIT/Apache-2.0"
