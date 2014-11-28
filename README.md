@@ -12,7 +12,7 @@ A cell with the ability to mutate the value through an immutable reference when 
 `RefCell` goes for completely runtime checking, having `try_borrow`, `try_borrow_mut`,
 `borrow` and `borrow_mut` all taking `&self` and using custom reference types everywhere.
 
-`MuCell` (out of pity and the fact that “non-asii idents are not fully supported” I did not
+`MuCell` (out of pity and the fact that “non-ascii idents are not fully supported” I did not
 name it `ΜCell` with the crate named `µcell`) makes much more use of true Rust borrow checking
 for a result that is more efficient and has no possibility of panicking.
 
