@@ -68,16 +68,18 @@
 
 #![unstable = "almost stable, but not the macro parts"]
 #![no_std]
-#![feature(unsafe_destructor, macro_rules)]
+#![feature(unsafe_destructor, macro_rules, phase)]
 #![warn(bad_style, unused, missing_docs)]
 
-extern crate core;
+#[phase(plugin, link)] extern crate core;
 
 #[cfg(test)] extern crate std;
 
 use core::cell::{Cell, UnsafeCell};
 use core::kinds::marker;
 use core::ops::{Deref, Drop};
+
+const MUTATING: uint = -1;
 
 /// A cell with the ability to mutate the value through an immutable reference when safe
 #[stable]
@@ -118,7 +120,9 @@ impl<T> MuCell<T> {
     #[inline]
     #[stable]
     pub fn borrow(&self) -> Ref<T> {
-        self.borrows.set(self.borrows.get() + 1);
+        let borrows = self.borrows.get();
+        debug_assert!(borrows != MUTATING);
+        self.borrows.set(borrows + 1);
         Ref { _parent: self }
     }
 
@@ -129,11 +133,19 @@ impl<T> MuCell<T> {
     ///
     /// If there are no immutable references active,
     /// this will execute the mutator function and return true.
+    ///
+    /// **Caution:** you MUST NOT call `borrow` on `self` inside the mutator (not that it would
+    /// make much sense to, from a memory safety perspective); while calling `try_mutate` inside it
+    /// will just return false, in debug builds calling `borrow` will panic and in release builds
+    /// it will break memory safety as you will have both a mutable and an immutable reference to
+    /// the same object at the same time. So don’t do it.
     #[inline]
     #[stable]
     pub fn try_mutate(&self, mutator: |&mut T|) -> bool {
         if self.borrows.get() == 0 {
+            self.borrows.set(MUTATING);
             mutator(unsafe { &mut *self.value.get() });
+            self.borrows.set(0);
             true
         } else {
             false
@@ -256,4 +268,17 @@ macro_rules! mucell_ref_type {
             }
         }
     }
+}
+
+#[test]
+#[should_fail]
+fn test_borrow_in_try_mutate() {
+    let a = MuCell::new(());
+    a.try_mutate(|_| { let _ = a.borrow(); });
+}
+
+#[test]
+fn test_try_mutate_in_try_mutate() {
+    let a = MuCell::new(());
+    assert!(a.try_mutate(|_| assert!(!a.try_mutate(|_| unreachable!()))));
 }
