@@ -68,16 +68,24 @@
 
 #![unstable = "almost stable, but not the macro parts"]
 #![no_std]
-#![feature(unsafe_destructor, macro_rules, phase)]
+#![feature(unsafe_destructor, macro_rules, phase, default_type_params)]
 #![warn(bad_style, unused, missing_docs)]
 
 #[phase(plugin, link)] extern crate core;
+extern crate serialize;
+extern crate rand;
+extern crate collections;
 
 #[cfg(test)] extern crate std;
 
 use core::cell::{Cell, UnsafeCell};
+use core::default::Default;
+use core::fmt;
 use core::kinds::marker;
-use core::ops::{Deref, Drop};
+use serialize::{Encoder, Decoder, Encodable, Decodable};
+use rand::{Rand, Rng};
+use collections::hash::{Hash, sip};
+use core::prelude::{Option, Clone, Result, PartialEq, Eq, PartialOrd, Ord, Ordering, Deref, Drop};
 
 const MUTATING: uint = -1;
 
@@ -134,11 +142,13 @@ impl<T> MuCell<T> {
     /// If there are no immutable references active,
     /// this will execute the mutator function and return true.
     ///
-    /// **Caution:** you MUST NOT call `borrow` on `self` inside the mutator (not that it would
-    /// make much sense to, from a memory safety perspective); while calling `try_mutate` inside it
-    /// will just return false, in debug builds calling `borrow` will panic and in release builds
-    /// it will break memory safety as you will have both a mutable and an immutable reference to
-    /// the same object at the same time. So don’t do it.
+    /// **Caution:** you should avoid touching `self` inside the mutator (not that it would really
+    /// make much sense to be touching it, anyway); most notably, you MUST NOT call `borrow` on
+    /// `self` inside the mutator, which includes things like the `==` implementation which borrow
+    /// the value briefly; while calling `try_mutate` inside it will just return false, in debug
+    /// builds calling `borrow` will panic and in release builds it will break memory safety as you
+    /// will have both a mutable and an immutable reference to the same object at the same time
+    /// (yep, it’s not quite preventing aliasing). So don’t do it.
     #[inline]
     #[stable]
     pub fn try_mutate(&self, mutator: |&mut T|) -> bool {
@@ -171,6 +181,84 @@ impl<'a, T: 'a> Drop for Ref<'a, T> {
 impl<'a, T: 'a> Deref<T> for Ref<'a, T> {
     fn deref(&self) -> &T {
         unsafe { &*self._parent.value.get() }
+    }
+}
+
+#[unstable = "trait is not stable"]
+impl<T: PartialEq> PartialEq for MuCell<T> {
+    fn eq(&self, other: &MuCell<T>) -> bool {
+        *self.borrow() == *other.borrow()
+    }
+}
+
+#[unstable = "trait is not stable"]
+impl<T: Eq> Eq for MuCell<T> { }
+
+#[unstable = "trait is not stable"]
+impl<T: PartialOrd> PartialOrd for MuCell<T> {
+    fn partial_cmp(&self, other: &MuCell<T>) -> Option<Ordering> {
+        self.borrow().partial_cmp(&*other.borrow())
+    }
+}
+
+#[unstable = "trait is not stable"]
+impl<T: Ord> Ord for MuCell<T> {
+    fn cmp(&self, other: &MuCell<T>) -> Ordering {
+        self.borrow().cmp(&*other.borrow())
+    }
+}
+
+#[unstable = "trait is not stable"]
+impl<T: Default> Default for MuCell<T> {
+    fn default() -> MuCell<T> {
+        MuCell::new(Default::default())
+    }
+}
+
+#[unstable = "trait is not stable"]
+impl<T: Clone> Clone for MuCell<T> {
+    fn clone(&self) -> MuCell<T> {
+        MuCell::new(self.borrow().clone())
+    }
+}
+
+macro_rules! impl_fmt {
+    ($($trait_name:ident)*) => {$(
+        #[unstable = "trait is not stable"]
+        impl<T: fmt::$trait_name> fmt::$trait_name for MuCell<T> {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                self.borrow().fmt(f)
+            }
+        }
+    )*}
+}
+impl_fmt!(Show Octal Binary LowerHex UpperHex Pointer LowerExp UpperExp)
+
+#[unstable = "trait is not stable"]
+impl<S: Encoder<E>, E, T: Encodable<S, E>> Encodable<S, E> for MuCell<T> {
+    fn encode(&self, s: &mut S) -> Result<(), E> {
+        self.borrow().encode(s)
+    }
+}
+
+#[unstable = "trait is not stable"]
+impl<D: Decoder<E>, E, T: Decodable<D, E>> Decodable<D, E> for MuCell<T> {
+    fn decode(d: &mut D) -> Result<MuCell<T>, E> {
+        Decodable::decode(d).map(|x| MuCell::new(x))
+    }
+}
+
+#[unstable = "trait is not stable"]
+impl<T: Rand> Rand for MuCell<T> {
+    fn rand<R: Rng>(rng: &mut R) -> MuCell<T> {
+        MuCell::new(Rand::rand(rng))
+    }
+}
+
+#[unstable = "trait is not stable"]
+impl<T: Hash<S>, S = sip::SipState> Hash<S> for MuCell<T> {
+    fn hash(&self, state: &mut S) {
+        self.borrow().hash(state)
     }
 }
 
