@@ -84,7 +84,7 @@ use core::fmt;
 use core::kinds::marker;
 use serialize::{Encoder, Decoder, Encodable, Decodable};
 use rand::{Rand, Rng};
-use collections::hash::{Hash, sip};
+use core::hash::{Hash, sip};
 use core::prelude::{Option, Clone, Result, PartialEq, Eq, PartialOrd, Ord, Ordering, Deref, Drop};
 
 const MUTATING: uint = -1;
