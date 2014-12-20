@@ -232,7 +232,7 @@ macro_rules! impl_fmt {
         }
     )*}
 }
-impl_fmt!(Show Octal Binary LowerHex UpperHex Pointer LowerExp UpperExp)
+impl_fmt!(Show Octal Binary LowerHex UpperHex Pointer LowerExp UpperExp);
 
 #[unstable = "trait is not stable"]
 impl<S: Encoder<E>, E, T: Encodable<S, E>> Encodable<S, E> for MuCell<T> {
