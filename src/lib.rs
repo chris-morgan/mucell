@@ -72,7 +72,6 @@
 #![warn(bad_style, unused, missing_docs)]
 
 #[phase(plugin, link)] extern crate core;
-extern crate serialize;
 extern crate rand;
 extern crate collections;
 
@@ -82,7 +81,6 @@ use core::cell::{Cell, UnsafeCell};
 use core::default::Default;
 use core::fmt;
 use core::kinds::marker;
-use serialize::{Encoder, Decoder, Encodable, Decodable};
 use rand::{Rand, Rng};
 use core::hash::{Hash, sip};
 use core::prelude::{Option, Clone, Result, PartialEq, Eq, PartialOrd, Ord, Ordering, Deref, Drop};
@@ -235,20 +233,6 @@ macro_rules! impl_fmt {
 impl_fmt!(Show Octal Binary LowerHex UpperHex Pointer LowerExp UpperExp);
 
 #[unstable = "trait is not stable"]
-impl<S: Encoder<E>, E, T: Encodable<S, E>> Encodable<S, E> for MuCell<T> {
-    fn encode(&self, s: &mut S) -> Result<(), E> {
-        self.borrow().encode(s)
-    }
-}
-
-#[unstable = "trait is not stable"]
-impl<D: Decoder<E>, E, T: Decodable<D, E>> Decodable<D, E> for MuCell<T> {
-    fn decode(d: &mut D) -> Result<MuCell<T>, E> {
-        Decodable::decode(d).map(|x| MuCell::new(x))
-    }
-}
-
-#[unstable = "trait is not stable"]
 impl<T: Rand> Rand for MuCell<T> {
     fn rand<R: Rng>(rng: &mut R) -> MuCell<T> {
         MuCell::new(Rand::rand(rng))
@@ -305,7 +289,7 @@ impl<T: Hash<S>, S = sip::SipState> Hash<S> for MuCell<T> {
 /// }
 ///
 /// fn main() {
-///     demo(&MuCell::new(Foo { bar: "panic".into_string() }));
+///     demo(&MuCell::new(Foo { bar: "panic".to_string() }));
 /// }
 /// ```
 ///
