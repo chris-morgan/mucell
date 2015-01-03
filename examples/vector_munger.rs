@@ -57,7 +57,7 @@ impl Inner {
 mucell_ref_type! {
     #[doc = "…"]
     struct MungedRef<'a>(Inner)
-    impl Deref<[int]>
+    impl Deref -> [int]
     data: Cow<'a, Vec<int>, [int]> = |x| x.munged()
 }
 

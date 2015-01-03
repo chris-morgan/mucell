@@ -68,7 +68,7 @@
 
 #![unstable = "almost stable, but not the macro parts"]
 #![no_std]
-#![feature(unsafe_destructor, macro_rules, phase, default_type_params)]
+#![feature(unsafe_destructor, macro_rules, phase, default_type_params, associated_types)]
 #![warn(bad_style, unused, missing_docs)]
 
 #[phase(plugin, link)] extern crate core;
@@ -83,7 +83,9 @@ use core::fmt;
 use core::kinds::marker;
 use rand::{Rand, Rng};
 use core::hash::{Hash, sip};
-use core::prelude::{Option, Clone, Result, PartialEq, Eq, PartialOrd, Ord, Ordering, Deref, Drop};
+use core::prelude::{Option, Clone, Result, PartialEq, Eq, PartialOrd, Ord};
+use core::cmp::Ordering;
+use core::ops::{Deref, Drop};
 
 const MUTATING: uint = -1;
 
@@ -176,7 +178,9 @@ impl<'a, T: 'a> Drop for Ref<'a, T> {
 }
 
 #[unstable = "trait is not stable"]
-impl<'a, T: 'a> Deref<T> for Ref<'a, T> {
+impl<'a, T: 'a> Deref for Ref<'a, T> {
+    type Target = T;
+
     fn deref(&self) -> &T {
         unsafe { &*self._parent.value.get() }
     }
@@ -240,8 +244,8 @@ impl<T: Rand> Rand for MuCell<T> {
 }
 
 #[unstable = "trait is not stable"]
-impl<T: Hash<S>, S = sip::SipState> Hash<S> for MuCell<T> {
-    fn hash(&self, state: &mut S) {
+impl<T: Hash> Hash for MuCell<T> {
+    fn hash(&self, state: &mut sip::SipState) {
         self.borrow().hash(state)
     }
 }
@@ -267,7 +271,7 @@ impl<T: Hash<S>, S = sip::SipState> Hash<S> for MuCell<T> {
 /// mucell_ref_type! {
 ///     #[doc = "…"]
 ///     struct BarRef<'a>(Foo)
-///     impl Deref<str>
+///     impl Deref -> str
 ///     data: &'a str = |x| x.bar.as_slice()
 /// }
 ///
@@ -300,7 +304,7 @@ macro_rules! mucell_ref_type {
     (
         $(#[$attr:meta])*  // suggestions: doc, stability markers
         struct $ref_name:ident<'a>($ty:ty)
-        impl Deref<$deref:ty>
+        impl Deref -> $deref:ty
         data: $data_ty:ty = |$data_ident:ident| $data_expr:expr
     ) => {
         /// An immutable reference to a `MuCell`. Dereference to get at the object.
@@ -334,7 +338,8 @@ macro_rules! mucell_ref_type {
         }
 
         #[unstable = "trait is not stable"]
-        impl<'a> Deref<$deref> for $ref_name<'a> {
+        impl<'a> ::std::ops::Deref for $ref_name<'a> {
+            type Target = $deref;
             fn deref<'b>(&'b self) -> &'b $deref {
                 &*self._data
             }
