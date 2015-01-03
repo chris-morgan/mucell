@@ -186,38 +186,38 @@ impl<'a, T: 'a> Deref for Ref<'a, T> {
     }
 }
 
-#[unstable = "trait is not stable"]
+#[stable]
 impl<T: PartialEq> PartialEq for MuCell<T> {
     fn eq(&self, other: &MuCell<T>) -> bool {
         *self.borrow() == *other.borrow()
     }
 }
 
-#[unstable = "trait is not stable"]
+#[stable]
 impl<T: Eq> Eq for MuCell<T> { }
 
-#[unstable = "trait is not stable"]
+#[stable]
 impl<T: PartialOrd> PartialOrd for MuCell<T> {
     fn partial_cmp(&self, other: &MuCell<T>) -> Option<Ordering> {
         self.borrow().partial_cmp(&*other.borrow())
     }
 }
 
-#[unstable = "trait is not stable"]
+#[stable]
 impl<T: Ord> Ord for MuCell<T> {
     fn cmp(&self, other: &MuCell<T>) -> Ordering {
         self.borrow().cmp(&*other.borrow())
     }
 }
 
-#[unstable = "trait is not stable"]
+#[stable]
 impl<T: Default> Default for MuCell<T> {
     fn default() -> MuCell<T> {
         MuCell::new(Default::default())
     }
 }
 
-#[unstable = "trait is not stable"]
+#[stable]
 impl<T: Clone> Clone for MuCell<T> {
     fn clone(&self) -> MuCell<T> {
         MuCell::new(self.borrow().clone())
