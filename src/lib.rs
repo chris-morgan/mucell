@@ -83,7 +83,7 @@ use core::fmt;
 use core::kinds::marker;
 use rand::{Rand, Rng};
 use core::hash::{Hash, sip};
-use core::prelude::{Option, Clone, Result, PartialEq, Eq, PartialOrd, Ord};
+use core::prelude::{Option, Clone, Result, PartialEq, Eq, PartialOrd, Ord, FnOnce};
 use core::cmp::Ordering;
 use core::ops::{Deref, Drop};
 
@@ -151,7 +151,7 @@ impl<T> MuCell<T> {
     /// (yep, it’s not quite preventing aliasing). So don’t do it.
     #[inline]
     #[stable]
-    pub fn try_mutate(&self, mutator: |&mut T|) -> bool {
+    pub fn try_mutate<F: FnOnce(&mut T)>(&self, mutator: F) -> bool {
         if self.borrows.get() == 0 {
             self.borrows.set(MUTATING);
             mutator(unsafe { &mut *self.value.get() });
