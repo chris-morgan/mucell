@@ -1,6 +1,4 @@
-#![feature(phase)]
-
-#[phase(plugin, link)] extern crate mucell;
+#[macro_use] extern crate mucell;
 use mucell::{MuCell, Ref};
 use std::collections::HashMap;
 use std::borrow::Cow;

@@ -68,10 +68,10 @@
 
 #![unstable = "almost stable, but not the macro parts"]
 #![no_std]
-#![feature(unsafe_destructor, macro_rules, phase, default_type_params, associated_types)]
+#![feature(unsafe_destructor)]
 #![warn(bad_style, unused, missing_docs)]
 
-#[phase(plugin, link)] extern crate core;
+#[macro_use] extern crate core;
 extern crate rand;
 extern crate collections;
 
@@ -260,8 +260,7 @@ impl<T: Hash> Hash for MuCell<T> {
 /// Here’s an example of usage:
 ///
 /// ```rust
-/// #![feature(phase)]
-/// #[phase(plugin, link)] extern crate mucell;
+/// #[macro_use] extern crate mucell;
 /// use mucell::{MuCell, Ref};
 ///
 /// struct Foo {
