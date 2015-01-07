@@ -54,8 +54,8 @@ impl Inner {
 
 mucell_ref_type! {
     #[doc = "…"]
-    struct MungedRef<'a>(Inner)
-    impl Deref -> [int]
+    struct MungedRef<'a>(Inner),
+    impl Deref -> [int],
     data: Cow<'a, Vec<int>, [int]> = |x| x.munged()
 }
 
@@ -83,7 +83,7 @@ fn main() {
 
     // Whether it had happened or not, this part is definitely true:
     let a = MungedRef::from(item);
-    assert_eq!(&*a, [2, 3, 4][]);
+    assert_eq!(&*a, &[2, 3, 4][]);
 
     // Now suppose we do the same for bar, which has been borrowed.
     let item = items.get(&"bar").unwrap();
@@ -93,6 +93,6 @@ fn main() {
 
     // … but the MungedRef is still just fine.
     let a = MungedRef::from(item);
-    assert_eq!(&*a, [5, 6, 7][]);
+    assert_eq!(&*a, &[5, 6, 7][]);
 
 }

@@ -1,11 +1,11 @@
-mucell 0.1.8
+mucell 0.1.9
 ============
 
 [![Build Status](https://travis-ci.org/chris-morgan/mucell.svg?branch=master)](https://travis-ci.org/chris-morgan/mucell)
 
-A cell with the ability to mutate the value through an immutable reference when safe.
-
 <!-- The rest of this section comes straight from the crate docs. -->
+
+A cell with the ability to mutate the value through an immutable reference when safe.
 
 ## Comparison with `RefCell`
 
@@ -42,12 +42,12 @@ cell.borrow_mut().push(4);
 // You can borrow immutably, too, and it’s very cheap.
 // (Rust’s standard borrow checking prevents you from doing
 // this while there’s a mutable reference taken out.)
-assert_eq!(cell.borrow()[], [1, 2, 3, 4][]);
+assert_eq!(&cell.borrow()[], &[1, 2, 3, 4][]);
 
 // So long as there are no active borrows,
 // try_mutate can be used to mutate the value.
 assert!(cell.try_mutate(|x| x.push(5)));
-assert_eq!(cell.borrow()[], [1, 2, 3, 4, 5][]);
+assert_eq!(&cell.borrow()[], &[1, 2, 3, 4, 5][]);
 
 // But when there is an immutable borrow active,
 // try_mutate says no.
@@ -65,7 +65,7 @@ drop(b);
 
 // Once they’re all cleared, try_mutate is happy again.
 assert!(cell.try_mutate(|x| x.push(6)));
-assert_eq!(cell.borrow()[], [1, 2, 3, 4, 5, 6][]);
+assert_eq!(&cell.borrow()[], &[1, 2, 3, 4, 5, 6][]);
 ```
 
 Look at the examples in the repository for some slightly more practical (though still
