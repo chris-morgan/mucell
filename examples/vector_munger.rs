@@ -1,15 +1,16 @@
+#![allow(unstable)]
 #[macro_use] extern crate mucell;
 use mucell::{MuCell, Ref};
 use std::collections::HashMap;
 use std::borrow::Cow;
 
 struct Inner {
-    pub value: Vec<int>,
-    munged: Option<Vec<int>>,
+    pub value: Vec<i32>,
+    munged: Option<Vec<i32>>,
 }
 
 impl Inner {
-    pub fn new(value: Vec<int>) -> Inner {
+    pub fn new(value: Vec<i32>) -> Inner {
         Inner {
             value: value,
             munged: None,
@@ -20,7 +21,7 @@ impl Inner {
     ///
     /// (Demonstration of how anything altering `value` would need to set `munged` to `None`.)
     #[allow(dead_code)]
-    pub fn set(&mut self, value: Vec<int>) {
+    pub fn set(&mut self, value: Vec<i32>) {
         self.value = value;
         self.munged = None;
     }
@@ -35,7 +36,7 @@ impl Inner {
     /// Get the munged value from an immutable reference,
     /// either a reference to the pre-prepared value if it’s
     /// already made or a new vector.
-    pub fn munged(&self) -> Cow<Vec<int>, [int]> {
+    pub fn munged(&self) -> Cow<Vec<i32>, [i32]> {
         match self.munged {
             Some(ref x) => Cow::Borrowed(x.as_slice()),
             None => Cow::Owned(self.value.iter().map(|&x| x + 1).collect()),
@@ -55,8 +56,8 @@ impl Inner {
 mucell_ref_type! {
     #[doc = "…"]
     struct MungedRef<'a>(Inner),
-    impl Deref -> [int],
-    data: Cow<'a, Vec<int>, [int]> = |x| x.munged()
+    impl Deref -> [i32],
+    data: Cow<'a, Vec<i32>, [i32]> = |x| x.munged()
 }
 
 fn main() {
@@ -83,7 +84,7 @@ fn main() {
 
     // Whether it had happened or not, this part is definitely true:
     let a = MungedRef::from(item);
-    assert_eq!(&*a, &[2, 3, 4][]);
+    assert_eq!(&*a, [2, 3, 4]);
 
     // Now suppose we do the same for bar, which has been borrowed.
     let item = items.get(&"bar").unwrap();
@@ -93,6 +94,6 @@ fn main() {
 
     // … but the MungedRef is still just fine.
     let a = MungedRef::from(item);
-    assert_eq!(&*a, &[5, 6, 7][]);
+    assert_eq!(&*a, [5, 6, 7]);
 
 }
