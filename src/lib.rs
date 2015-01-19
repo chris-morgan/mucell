@@ -68,7 +68,7 @@
 
 #![unstable = "almost stable, but not the macro parts"]
 #![no_std]
-#![feature(unsafe_destructor)]
+#![feature(unsafe_destructor, optin_builtin_traits)]
 #![warn(bad_style, unused, missing_docs)]
 #![allow(unstable)]
 
@@ -95,9 +95,9 @@ const MUTATING: usize = -1;
 pub struct MuCell<T> {
     value: UnsafeCell<T>,
     borrows: Cell<usize>,
-    nocopy: marker::NoCopy,
-    noshare: marker::NoSync,
 }
+
+impl<T> !marker::Sync for MuCell<T> { }
 
 #[stable]
 impl<T> MuCell<T> {
@@ -108,8 +108,6 @@ impl<T> MuCell<T> {
         MuCell {
             value: UnsafeCell::new(value),
             borrows: Cell::new(0),
-            nocopy: marker::NoCopy,
-            noshare: marker::NoSync,
         }
     }
 
