@@ -69,8 +69,8 @@
 #![unstable = "almost stable, but not the macro parts"]
 #![no_std]
 #![feature(unsafe_destructor, optin_builtin_traits)]
+#![feature(core, rand, collections, hash)]
 #![warn(bad_style, unused, missing_docs)]
-#![allow(unstable)]
 
 #[macro_use] extern crate core;
 extern crate rand;
@@ -233,7 +233,7 @@ macro_rules! impl_fmt {
         }
     )*}
 }
-impl_fmt!(Show Octal Binary LowerHex UpperHex Pointer LowerExp UpperExp);
+impl_fmt!(Display Debug Octal LowerHex UpperHex Pointer Binary LowerExp UpperExp);
 
 #[unstable = "trait is not stable"]
 impl<T: Rand> Rand for MuCell<T> {

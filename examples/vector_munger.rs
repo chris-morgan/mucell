@@ -1,4 +1,5 @@
-#![allow(unstable)]
+#![feature(core)]
+
 #[macro_use] extern crate mucell;
 use mucell::{MuCell, Ref};
 use std::collections::HashMap;
