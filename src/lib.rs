@@ -69,11 +69,10 @@
 #![unstable = "almost stable, but not the macro parts"]
 #![no_std]
 #![feature(unsafe_destructor, optin_builtin_traits)]
-#![feature(core, rand, collections, hash)]
+#![feature(core, collections, hash)]
 #![warn(bad_style, unused, missing_docs)]
 
 #[macro_use] extern crate core;
-extern crate rand;
 extern crate collections;
 
 #[cfg(test)] extern crate std;
@@ -82,7 +81,6 @@ use core::cell::{Cell, UnsafeCell};
 use core::default::Default;
 use core::fmt;
 use core::marker;
-use rand::{Rand, Rng};
 use core::hash::{Hash, Hasher};
 use core::prelude::{Option, Clone, Result, PartialEq, Eq, PartialOrd, Ord, FnOnce};
 use core::cmp::Ordering;
@@ -234,13 +232,6 @@ macro_rules! impl_fmt {
     )*}
 }
 impl_fmt!(Display Debug Octal LowerHex UpperHex Pointer Binary LowerExp UpperExp);
-
-#[unstable = "trait is not stable"]
-impl<T: Rand> Rand for MuCell<T> {
-    fn rand<R: Rng>(rng: &mut R) -> MuCell<T> {
-        MuCell::new(Rand::rand(rng))
-    }
-}
 
 #[unstable = "trait is not stable"]
 impl<H, T> Hash<H> for MuCell<T> where H: Hasher, T: Hash<H> {
