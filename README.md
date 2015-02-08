@@ -1,4 +1,4 @@
-mucell 0.1.13
+mucell 0.1.14
 =============
 
 [![Build Status](https://travis-ci.org/chris-morgan/mucell.svg?branch=master)](https://travis-ci.org/chris-morgan/mucell)

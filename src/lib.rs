@@ -68,7 +68,7 @@
 
 #![unstable = "almost stable, but not the macro parts"]
 #![no_std]
-#![feature(unsafe_destructor, optin_builtin_traits)]
+#![feature(no_std, unsafe_destructor, optin_builtin_traits)]
 #![feature(core, collections, hash)]
 #![warn(bad_style, unused, missing_docs)]
 
