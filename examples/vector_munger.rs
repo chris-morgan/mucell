@@ -37,7 +37,7 @@ impl Inner {
     /// Get the munged value from an immutable reference,
     /// either a reference to the pre-prepared value if it’s
     /// already made or a new vector.
-    pub fn munged(&self) -> Cow<Vec<i32>, [i32]> {
+    pub fn munged(&self) -> Cow<[i32]> {
         match self.munged {
             Some(ref x) => Cow::Borrowed(x.as_slice()),
             None => Cow::Owned(self.value.iter().map(|&x| x + 1).collect()),
@@ -58,7 +58,7 @@ mucell_ref_type! {
     #[doc = "…"]
     struct MungedRef<'a>(Inner),
     impl Deref -> [i32],
-    data: Cow<'a, Vec<i32>, [i32]> = |x| x.munged()
+    data: Cow<'a, [i32]> = |x| x.munged()
 }
 
 fn main() {
