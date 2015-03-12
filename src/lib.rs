@@ -88,7 +88,6 @@ use core::ops::{Deref, Drop};
 const MUTATING: usize = -1;
 
 /// A cell with the ability to mutate the value through an immutable reference when safe
-#[stable]
 pub struct MuCell<T> {
     value: UnsafeCell<T>,
     borrows: Cell<usize>,
@@ -96,11 +95,9 @@ pub struct MuCell<T> {
 
 impl<T> !marker::Sync for MuCell<T> { }
 
-#[stable]
 impl<T> MuCell<T> {
     /// Construct a new cell containing the given value
     #[inline]
-    #[stable]
     pub fn new(value: T) -> MuCell<T> {
         MuCell {
             value: UnsafeCell::new(value),
@@ -112,7 +109,6 @@ impl<T> MuCell<T> {
     ///
     /// This is genuinely and completely free.
     #[inline]
-    #[stable]
     pub fn borrow_mut(&mut self) -> &mut T {
         unsafe { &mut *self.value.get() }
     }
@@ -122,7 +118,6 @@ impl<T> MuCell<T> {
     /// Unlike `borrow_mut`, this isn’t *quite* free, but oh, so all but! It has a smattering of
     /// reference counting. No branches, though, so it’s as fast as is computationally possible.
     #[inline]
-    #[stable]
     pub fn borrow(&self) -> Ref<T> {
         let borrows = self.borrows.get();
         debug_assert!(borrows != MUTATING);
@@ -146,7 +141,6 @@ impl<T> MuCell<T> {
     /// will have both a mutable and an immutable reference to the same object at the same time
     /// (yep, it’s not quite preventing aliasing). So don’t do it.
     #[inline]
-    #[stable]
     pub fn try_mutate<F: FnOnce(&mut T)>(&self, mutator: F) -> bool {
         if self.borrows.get() == 0 {
             self.borrows.set(MUTATING);
@@ -160,20 +154,17 @@ impl<T> MuCell<T> {
 }
 
 /// An immutable reference to a `MuCell`. Dereference to get at the object.
-#[stable]
 pub struct Ref<'a, T: 'a> {
     _parent: &'a MuCell<T>,
 }
 
 #[unsafe_destructor]
-#[unstable = "trait is not stable"]
 impl<'a, T: 'a> Drop for Ref<'a, T> {
     fn drop(&mut self) {
         self._parent.borrows.set(self._parent.borrows.get() - 1);
     }
 }
 
-#[unstable = "trait is not stable"]
 impl<'a, T: 'a> Deref for Ref<'a, T> {
     type Target = T;
 
@@ -182,38 +173,32 @@ impl<'a, T: 'a> Deref for Ref<'a, T> {
     }
 }
 
-#[stable]
 impl<T: PartialEq> PartialEq for MuCell<T> {
     fn eq(&self, other: &MuCell<T>) -> bool {
         *self.borrow() == *other.borrow()
     }
 }
 
-#[stable]
 impl<T: Eq> Eq for MuCell<T> { }
 
-#[stable]
 impl<T: PartialOrd> PartialOrd for MuCell<T> {
     fn partial_cmp(&self, other: &MuCell<T>) -> Option<Ordering> {
         self.borrow().partial_cmp(&*other.borrow())
     }
 }
 
-#[stable]
 impl<T: Ord> Ord for MuCell<T> {
     fn cmp(&self, other: &MuCell<T>) -> Ordering {
         self.borrow().cmp(&*other.borrow())
     }
 }
 
-#[stable]
 impl<T: Default> Default for MuCell<T> {
     fn default() -> MuCell<T> {
         MuCell::new(Default::default())
     }
 }
 
-#[stable]
 impl<T: Clone> Clone for MuCell<T> {
     fn clone(&self) -> MuCell<T> {
         MuCell::new(self.borrow().clone())
@@ -222,7 +207,6 @@ impl<T: Clone> Clone for MuCell<T> {
 
 macro_rules! impl_fmt {
     ($($trait_name:ident)*) => {$(
-        #[unstable = "trait is not stable"]
         impl<T: fmt::$trait_name> fmt::$trait_name for MuCell<T> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 self.borrow().fmt(f)
@@ -232,7 +216,6 @@ macro_rules! impl_fmt {
 }
 impl_fmt!(Display Debug Octal LowerHex UpperHex Pointer Binary LowerExp UpperExp);
 
-#[unstable = "trait is not stable"]
 impl<T> Hash for MuCell<T> where T: Hash {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.borrow().hash(state)
@@ -287,7 +270,6 @@ impl<T> Hash for MuCell<T> where T: Hash {
 ///
 /// The `vector_munger` example demonstrates a more complex use case.
 #[macro_export]
-#[experimental]
 macro_rules! mucell_ref_type {
     (
         $(#[$attr:meta])*  // suggestions: doc, stability markers
@@ -302,10 +284,8 @@ macro_rules! mucell_ref_type {
             _data: $data_ty,
         }
 
-        #[unstable = "still a little experimental, like the whole macro"]
         impl<'a> $ref_name<'a> {
             /// Construct a reference from the cell.
-            #[unstable = "still a little experimental, like the whole macro"]
             fn from(cell: &'a MuCell<$ty>) -> $ref_name<'a> {
                 let parent = cell.borrow();
                 // This transmutation is to fix the lifetime of the reference so it is 'a rather
@@ -325,7 +305,6 @@ macro_rules! mucell_ref_type {
             }
         }
 
-        #[unstable = "trait is not stable"]
         impl<'a> ::std::ops::Deref for $ref_name<'a> {
             type Target = $deref;
             fn deref<'b>(&'b self) -> &'b $deref {
@@ -336,7 +315,7 @@ macro_rules! mucell_ref_type {
 }
 
 #[test]
-#[should_fail]
+#[should_panic]
 fn test_borrow_in_try_mutate() {
     let a = MuCell::new(());
     a.try_mutate(|_| { let _ = a.borrow(); });
