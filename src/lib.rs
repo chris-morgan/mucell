@@ -52,7 +52,7 @@
 //!     let a = cell.borrow();
 //!     let b = cell.borrow();
 //!     let c = cell.borrow();
-//!     assert_eq!(&*a as *const _, &*b as *const _);
+//!     assert_eq!(&*a as *const Vec<i32>, &*b as *const Vec<i32>);
 //! }
 //!
 //! // Once they’re all cleared, try_mutate is happy again.
@@ -232,6 +232,7 @@ impl<T> Hash for MuCell<T> where T: Hash {
 /// Here’s an example of usage:
 ///
 /// ```rust
+/// #![feature(convert)]
 /// #[macro_use] extern crate mucell;
 /// use mucell::{MuCell, Ref};
 ///
@@ -243,13 +244,13 @@ impl<T> Hash for MuCell<T> where T: Hash {
 ///     #[doc = "…"]
 ///     struct BarRef<'a>(Foo),
 ///     impl Deref -> str,
-///     data: &'a str = |x| x.bar.as_slice()
+///     data: &'a str = |x| x.bar.as_ref()
 /// }
 ///
 /// fn pull_string_out(foo: &MuCell<Foo>) -> BarRef {
 ///     // Maybe pretend we did something like `try_mutate` here.
 ///
-///     // We would not be able to return foo.borrow().bar.as_slice()
+///     // We would not be able to return foo.borrow().bar.as_ref()
 ///     // here because the borrow() lifetime would be too short.
 ///     // So we use our fancy new ref type!
 ///     BarRef::from(foo)
@@ -286,6 +287,7 @@ macro_rules! mucell_ref_type {
 
         impl<'a> $ref_name<'a> {
             /// Construct a reference from the cell.
+            #[allow(trivial_casts)]  // The `as *const $ty` cast
             fn from(cell: &'a MuCell<$ty>) -> $ref_name<'a> {
                 let parent = cell.borrow();
                 // This transmutation is to fix the lifetime of the reference so it is 'a rather

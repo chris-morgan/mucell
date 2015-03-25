@@ -1,4 +1,4 @@
-#![feature(core)]
+#![feature(convert)]
 
 #[macro_use] extern crate mucell;
 use mucell::{MuCell, Ref};
@@ -39,7 +39,7 @@ impl Inner {
     /// already made or a new vector.
     pub fn munged(&self) -> Cow<[i32]> {
         match self.munged {
-            Some(ref x) => Cow::Borrowed(x.as_slice()),
+            Some(ref x) => Cow::Borrowed(x.as_ref()),
             None => Cow::Owned(self.value.iter().map(|&x| x + 1).collect()),
         }
     }
