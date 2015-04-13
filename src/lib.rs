@@ -85,7 +85,7 @@ use core::prelude::{Option, Clone, Result, PartialEq, Eq, PartialOrd, Ord, FnOnc
 use core::cmp::Ordering;
 use core::ops::{Deref, Drop};
 
-const MUTATING: usize = -1;
+const MUTATING: usize = !0;
 
 /// A cell with the ability to mutate the value through an immutable reference when safe
 pub struct MuCell<T> {
@@ -232,7 +232,6 @@ impl<T> Hash for MuCell<T> where T: Hash {
 /// Here’s an example of usage:
 ///
 /// ```rust
-/// #![feature(convert)]
 /// #[macro_use] extern crate mucell;
 /// use mucell::{MuCell, Ref};
 ///
