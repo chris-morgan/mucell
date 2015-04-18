@@ -1,6 +1,6 @@
 [package]
 name = "mucell"
-version = "0.1.18"
+version = "0.1.19"
 authors = ["Chris Morgan <me@chrismorgan.info>"]
 description = "A cell with the ability to mutate the value through an immutable reference when safe"
 #documentation = 

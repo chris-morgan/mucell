@@ -65,7 +65,6 @@
 //! title="mucell::mucell_ref_type!">mucell_ref_type!</a> docs for an example of that part of the
 //! library.
 
-#![unstable = "almost stable, but not the macro parts"]
 #![no_std]
 #![feature(no_std, unsafe_destructor, optin_builtin_traits)]
 #![feature(core, collections)]
