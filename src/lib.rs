@@ -17,8 +17,8 @@
 //! The purpose of all of this is for an accessor for a `T` that can be made more efficient if it
 //! can have `&mut self`, but doesn’t strictly require it. For this reason, it’s often going to be
 //! paired with [`std::borrow::Cow`](http://doc.rust-lang.org/std/borrow/enum.Cow.html), e.g.
-//! `Cow<str>` (a.k.a. `std::str::CowString`) or `Cow<[T]>` (a.k.a. `std::vec::CowVec`), producing
-//! `Borrowed` if you are able to mutate the value or `Owned` of the same data if not.
+//! `Cow<str>` or `Cow<[T]>`, producing `Borrowed` if you are able to mutate the value or `Owned`
+//! of the same data if not.
 //!
 //! # Examples
 //!
@@ -65,24 +65,31 @@
 //! title="mucell::mucell_ref_type!">mucell_ref_type!</a> docs for an example of that part of the
 //! library.
 
-#![no_std]
-#![feature(no_std, unsafe_destructor, optin_builtin_traits)]
-#![feature(core, collections)]
+#![cfg_attr(feature = "no_std", no_std)]
+#![cfg_attr(feature = "no_std", feature(no_std, core, collections))]
 #![warn(bad_style, unused, missing_docs)]
 
-#[macro_use] extern crate core;
+#[cfg(feature = "no_std")]
+#[macro_use]
+extern crate core;
+#[cfg(all(feature = "no_std", not(test)))]
+extern crate core as std;
+// ^^^ Ick! Alas, core’s panic macro currently hardcodes ::core rather than using $crate.
+#[cfg(feature = "no_std")]
 extern crate collections;
 
-#[cfg(test)] extern crate std;
+#[cfg(all(feature = "no_std", test))]
+extern crate std;
 
-use core::cell::{Cell, UnsafeCell};
-use core::default::Default;
-use core::fmt;
-use core::marker;
-use core::hash::{Hash, Hasher};
-use core::prelude::{Option, Clone, Result, PartialEq, Eq, PartialOrd, Ord, FnOnce};
-use core::cmp::Ordering;
-use core::ops::{Deref, Drop};
+use std::cell::{Cell, UnsafeCell};
+use std::clone::Clone;
+use std::cmp::{PartialEq, Eq, PartialOrd, Ord, Ordering};
+use std::default::Default;
+use std::fmt;
+use std::hash::{Hash, Hasher};
+use std::ops::{Deref, Drop, FnOnce};
+use std::option::Option;
+use std::result::Result;
 
 const MUTATING: usize = !0;
 
@@ -92,7 +99,7 @@ pub struct MuCell<T> {
     borrows: Cell<usize>,
 }
 
-impl<T> !marker::Sync for MuCell<T> { }
+//impl<T> !::std::marker::Sync for MuCell<T> { }
 
 impl<T> MuCell<T> {
     /// Construct a new cell containing the given value
@@ -114,12 +121,12 @@ impl<T> MuCell<T> {
 
     /// Borrow the contained object immutably.
     ///
-    /// Unlike `borrow_mut`, this isn’t *quite* free, but oh, so all but! It has a smattering of
-    /// reference counting. No branches, though, so it’s as fast as is computationally possible.
+    /// Unlike `borrow_mut`, this isn’t *quite* free, having a smattering of reference counting,
+    /// but it’s very cheap.
     #[inline]
     pub fn borrow(&self) -> Ref<T> {
         let borrows = self.borrows.get();
-        debug_assert!(borrows != MUTATING);
+        assert!(borrows != MUTATING, "borrow() called inside try_mutate()");
         self.borrows.set(borrows + 1);
         Ref { _parent: self }
     }
@@ -132,13 +139,11 @@ impl<T> MuCell<T> {
     /// If there are no immutable references active,
     /// this will execute the mutator function and return true.
     ///
-    /// **Caution:** you should avoid touching `self` inside the mutator (not that it would really
-    /// make much sense to be touching it, anyway); most notably, you MUST NOT call `borrow` on
+    /// The mutator function should not touch `self` (not that it would really
+    /// make much sense to be touching it, anyway); most notably, you may not call `borrow` on
     /// `self` inside the mutator, which includes things like the `==` implementation which borrow
-    /// the value briefly; while calling `try_mutate` inside it will just return false, in debug
-    /// builds calling `borrow` will panic and in release builds it will break memory safety as you
-    /// will have both a mutable and an immutable reference to the same object at the same time
-    /// (yep, it’s not quite preventing aliasing). So don’t do it.
+    /// the value briefly; while calling `try_mutate` inside it will just return false, calling
+    /// `borrow` will panic.
     #[inline]
     pub fn try_mutate<F: FnOnce(&mut T)>(&self, mutator: F) -> bool {
         if self.borrows.get() == 0 {
@@ -157,7 +162,6 @@ pub struct Ref<'a, T: 'a> {
     _parent: &'a MuCell<T>,
 }
 
-#[unsafe_destructor]
 impl<'a, T: 'a> Drop for Ref<'a, T> {
     fn drop(&mut self) {
         self._parent.borrows.set(self._parent.borrows.get() - 1);

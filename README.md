@@ -1,5 +1,5 @@
-mucell 0.1.19
-=============
+mucell 0.2.0
+============
 
 [![Build Status](https://travis-ci.org/chris-morgan/mucell.svg?branch=master)](https://travis-ci.org/chris-morgan/mucell)
 
@@ -24,8 +24,8 @@ the result of a calculation, but you don’t really want to *need* to do that.
 The purpose of all of this is for an accessor for a `T` that can be made more efficient if it
 can have `&mut self`, but doesn’t strictly require it. For this reason, it’s often going to be
 paired with [`std::borrow::Cow`](http://doc.rust-lang.org/std/borrow/enum.Cow.html), e.g.
-`Cow<str>` (a.k.a. `std::str::CowString`) or `Cow<[T]>` (a.k.a. `std::vec::CowVec`), producing
-`Borrowed` if you are able to mutate the value or `Owned` of the same data if not.
+`Cow<str>` or `Cow<[T]>`, producing `Borrowed` if you are able to mutate the value or `Owned`
+of the same data if not.
 
 ## Examples
 
@@ -76,6 +76,8 @@ Usage
 -----
 
 Cargo all the way. http://crates.io/crates/mucell
+
+This crate can be used with `#![no_std]` by enabling the `no_std` Cargo feature.
 
 Author
 ------
