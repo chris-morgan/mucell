@@ -52,13 +52,6 @@ impl Inner {
     }
 }
 
-mucell_ref_type! {
-    #[doc = "…"]
-    struct MungedRef<'a>(Inner),
-    impl Deref -> [i32],
-    data: Cow<'a, [i32]> = |x| x.munged()
-}
-
 fn main() {
     // Having these cells as the values in a map is about the most common mode of usage for this
     // library that I can think of.
@@ -73,16 +66,16 @@ fn main() {
     let item = items.get("foo").unwrap();
     // First of all, we see—can we ensure that we have the munged version, in place? If we can,
     // that will make retrieving the munged version multiple times (provided `set` is not called in
-    // between) more efficient, as it will only need to do the work once. Because MungedRef is
-    // operating on munged() which is Cow-based and doesn’t *need* `munge` to have been called,
-    // it’s fine if this mutation doesn’t actually happen.
+    // between) more efficient, as it will only need to do the work once. Because the
+    // `Ref::map(item.borrow(), item.munged())` is operating on the Cow basis and doesn’t *need*
+    // `munge` to have been called, it’s fine if this mutation doesn’t actually happen.
     item.try_mutate(|x| x.munge());
 
     // In this particular case, we know it’s done it.
     item.borrow().assert_munged_exists();
 
     // Whether it had happened or not, this part is definitely true:
-    let a = MungedRef::from(item);
+    let a = Ref::map(item.borrow(), |inner| inner.munged());
     assert_eq!(&*a, [2, 3, 4]);
 
     // Now suppose we do the same for bar, which has been borrowed.
@@ -91,8 +84,12 @@ fn main() {
     item.try_mutate(|x| x.munge());
     item.borrow().assert_munged_does_not_exist();
 
-    // … but the MungedRef is still just fine.
-    let a = MungedRef::from(item);
+    // … but the munged() Cow is still just fine.
+    let a = Ref::map(item.borrow(), |inner| inner.munged());
     assert_eq!(&*a, [5, 6, 7]);
+
+    // With another map call and an into_inner(), we can get the value out of
+    // it without cloning it all if it’s already Cow::Owned. Efficiency, yay!
+    let _munged: Vec<i32> = Ref::map(a, |a| a.into_owned()).into_inner();
 
 }

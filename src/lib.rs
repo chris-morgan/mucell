@@ -61,12 +61,11 @@
 //! ```
 //!
 //! Look at the examples in the repository for some slightly more practical (though still
-//! typically contrived) examples. Also see the <a class="macro" href="macro.mucell_ref_type!.html"
-//! title="mucell::mucell_ref_type!">mucell_ref_type!</a> docs for an example of that part of the
-//! library.
+//! typically contrived) examples.
 
 #![cfg_attr(feature = "no_std", no_std)]
 #![cfg_attr(feature = "no_std", feature(no_std, core, collections))]
+#![cfg_attr(feature = "const_fn", feature(const_fn))]
 #![warn(bad_style, unused, missing_docs)]
 
 #[cfg(feature = "no_std")]
@@ -81,6 +80,9 @@ extern crate collections;
 #[cfg(all(feature = "no_std", test))]
 extern crate std;
 
+#[cfg(feature = "no_std")]
+use std::marker::{Send, Sized};
+
 use std::cell::{Cell, UnsafeCell};
 use std::clone::Clone;
 use std::cmp::{PartialEq, Eq, PartialOrd, Ord, Ordering};
@@ -91,44 +93,109 @@ use std::ops::{Deref, Drop, FnOnce};
 use std::option::Option;
 use std::result::Result;
 
-const MUTATING: usize = !0;
+type BorrowFlag = usize;
+const UNUSED: BorrowFlag = 0;
+const WRITING: BorrowFlag = !0;
 
-/// A cell with the ability to mutate the value through an immutable reference when safe
-pub struct MuCell<T> {
+/// A cell with the ability to mutate the value through an immutable reference when safe.
+pub struct MuCell<T: ?Sized> {
+    borrow: Cell<BorrowFlag>,
     value: UnsafeCell<T>,
-    borrows: Cell<usize>,
 }
 
-//impl<T> !::std::marker::Sync for MuCell<T> { }
-
 impl<T> MuCell<T> {
-    /// Construct a new cell containing the given value
+    /// Creates a `MuCell` containing `value`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mucell::MuCell;
+    ///
+    /// let c = MuCell::new(5);
+    /// ```
     #[inline]
+    #[cfg(not(feature = "const_fn"))]
     pub fn new(value: T) -> MuCell<T> {
         MuCell {
             value: UnsafeCell::new(value),
-            borrows: Cell::new(0),
+            borrow: Cell::new(UNUSED),
         }
     }
 
-    /// Borrow the contained object mutably.
+    /// Creates a `MuCell` containing `value`.
     ///
-    /// This is genuinely and completely free.
+    /// # Examples
+    ///
+    /// ```
+    /// use mucell::MuCell;
+    ///
+    /// let c = MuCell::new(5);
+    /// ```
+    #[inline]
+    #[cfg(feature = "const_fn")]
+    pub const fn new(value: T) -> MuCell<T> {
+        MuCell {
+            value: UnsafeCell::new(value),
+            borrow: Cell::new(UNUSED),
+        }
+    }
+
+    /// Consumes the `MuCell`, returning the wrapped value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mucell::MuCell;
+    ///
+    /// let c = MuCell::new(5);
+    ///
+    /// let five = c.into_inner();
+    /// ```
+    #[inline]
+    pub fn into_inner(self) -> T {
+        // Since this function takes `self` (the `RefCell`) by value, the
+        // compiler statically verifies that it is not currently borrowed.
+        // Therefore the following assertion is just a `debug_assert!`.
+        debug_assert!(self.borrow.get() == UNUSED);
+        unsafe { self.value.into_inner() }
+    }
+}
+
+impl<T: ?Sized> MuCell<T> {
+    // Explicitly not implemented from RefCell is borrow_state.
+    //
+    // - Returning `Writing` would indicate you are in a `try_mutate` block, and so calling
+    //   `borrow()` would panic, but you should definitely know that already.
+    // - Returning `Reading` would indicate there are immutable borrows alive, and so calling
+    //   `try_mutate()` would return `false`, but there’s no real value in knowing that.
+    //
+    // In short, there just doesn’t seem much point in providing it.
+
+    /// Immutably borrows the wrapped value.
+    ///
+    /// The borrow lasts until the returned `Ref` exits scope.
+    /// Multiple immutable borrows can be taken out at the same time.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called inside the `try_mutate()` mutator function.
+    /// But that’s generally a nonsensical thing to do, anyway, so just be sensible and you’re OK.
+    #[inline]
+    pub fn borrow(&self) -> Ref<&T> {
+        Ref {
+            _borrow: BorrowRef::new(&self.borrow),
+            _value: unsafe { &*self.value.get() },
+        }
+    }
+
+    /// Mutably borrows the wrapped value.
+    ///
+    /// Unlike `RefCell.borrow_mut`, this method lets Rust’s type system prevent aliasing
+    /// and so cannot have anything go wrong. It is also, in consequence, completely free,
+    /// unlike `RefCell` or `MuCell.borrow` which all have to keep track of borrows at runtime.
     #[inline]
     pub fn borrow_mut(&mut self) -> &mut T {
         unsafe { &mut *self.value.get() }
-    }
-
-    /// Borrow the contained object immutably.
-    ///
-    /// Unlike `borrow_mut`, this isn’t *quite* free, having a smattering of reference counting,
-    /// but it’s very cheap.
-    #[inline]
-    pub fn borrow(&self) -> Ref<T> {
-        let borrows = self.borrows.get();
-        assert!(borrows != MUTATING, "borrow() called inside try_mutate()");
-        self.borrows.set(borrows + 1);
-        Ref { _parent: self }
     }
 
     /// Mutate the contained object if possible.
@@ -146,43 +213,190 @@ impl<T> MuCell<T> {
     /// `borrow` will panic.
     #[inline]
     pub fn try_mutate<F: FnOnce(&mut T)>(&self, mutator: F) -> bool {
-        if self.borrows.get() == 0 {
-            self.borrows.set(MUTATING);
+        if self.borrow.get() == UNUSED {
+            self.borrow.set(WRITING);
             mutator(unsafe { &mut *self.value.get() });
-            self.borrows.set(0);
+            self.borrow.set(UNUSED);
             true
         } else {
             false
         }
     }
+
+    // Not implemented at present from RefCell: as_unsafe_cell. I don’t see the point of it,
+    // but it can easily be added at a later date if desired.
 }
 
-/// An immutable reference to a `MuCell`. Dereference to get at the object.
-pub struct Ref<'a, T: 'a> {
-    _parent: &'a MuCell<T>,
+struct BorrowRef<'b> {
+    _borrow: &'b Cell<BorrowFlag>,
 }
 
-impl<'a, T: 'a> Drop for Ref<'a, T> {
+impl<'b> BorrowRef<'b> {
+    #[inline]
+    fn new(borrow: &'b Cell<BorrowFlag>) -> BorrowRef<'b> {
+        match borrow.get() {
+            WRITING => panic!("borrow() called inside try_mutate"),
+            b => {
+                borrow.set(b + 1);
+                BorrowRef { _borrow: borrow }
+            },
+        }
+    }
+}
+
+impl<'b> Drop for BorrowRef<'b> {
+    #[inline]
     fn drop(&mut self) {
-        self._parent.borrows.set(self._parent.borrows.get() - 1);
+        let borrow = self._borrow.get();
+        debug_assert!(borrow != WRITING && borrow != UNUSED);
+        self._borrow.set(borrow - 1);
     }
 }
 
-impl<'a, T: 'a> Deref for Ref<'a, T> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        unsafe { &*self._parent.value.get() }
+impl<'b> Clone for BorrowRef<'b> {
+    #[inline]
+    fn clone(&self) -> BorrowRef<'b> {
+        // Since this BorrowRef exists,
+        // we know the borrow flag is not set to WRITING.
+        let borrow = self._borrow.get();
+        debug_assert!(borrow != WRITING && borrow != UNUSED);
+        self._borrow.set(borrow + 1);
+        BorrowRef { _borrow: self._borrow }
     }
 }
 
-impl<T: PartialEq> PartialEq for MuCell<T> {
+/// An immutable reference to a `MuCell`.
+/// Normally you should dereference to get at the object,
+/// but after transformation with `Ref::map` or `Ref::filter_map`
+/// you might instead use `.into_inner()`.
+pub struct Ref<'b, T: 'b> {
+    // FIXME #12808: strange name to try to avoid interfering with
+    // field accesses of the contained type via Deref
+    _value: T,
+    _borrow: BorrowRef<'b>
+}
+
+impl<'b, T: Deref + 'b> Deref for Ref<'b, T> {
+    type Target = T::Target;
+
+    #[inline]
+    fn deref(&self) -> &T::Target {
+        &*self._value
+    }
+}
+
+impl<'b, T: Clone> Ref<'b, T> {
+    /// Copies a `Ref`.
+    ///
+    /// The `MuCell` is already immutably borrowed, so this cannot fail.
+    ///
+    /// This is an associated function that needs to be used as
+    /// `Ref::clone(...)`.  A `Clone` implementation or a method would interfere
+    /// with the widespread use of `r.borrow().clone()` to clone the contents of
+    /// a `MuCell`.
+    #[inline]
+    pub fn clone(orig: &Ref<'b, T>) -> Ref<'b, T> {
+        Ref {
+            _value: orig._value.clone(),
+            _borrow: orig._borrow.clone(),
+        }
+    }
+}
+
+impl<'b, T: 'static> Ref<'b, T> {
+    /// Consumes the `Ref`, returning the wrapped value.
+    ///
+    /// The `'static` constraint on `T` is what makes this possible; there is no longer any need to
+    /// keep the borrow alive, and so the `Ref` itself can be consumed while keeping the contained
+    /// value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mucell::{MuCell, Ref};
+    /// use std::borrow::Cow;
+    ///
+    /// let c = MuCell::new("foo");
+    ///
+    /// let r1: Ref<Cow<str>> = Ref::map(c.borrow(), |s| Cow::from(*s));
+    /// let r2: Ref<String> = Ref::map(r1, |s| s.into_owned());
+    /// let string: String = r2.into_inner();
+    /// ```
+    #[inline]
+    pub fn into_inner(self) -> T {
+        self._value
+    }
+}
+
+impl<'b, T> Ref<'b, T> {
+    /// Make a new `Ref` for a component of the borrowed data.
+    ///
+    /// The `MuCell` is already immutably borrowed, so this cannot fail.
+    ///
+    /// This is an associated function that needs to be used as `Ref::map(...)`.
+    /// A method would interfere with methods of the same name on the contents
+    /// of a `MuCell` used through `Deref`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use mucell::{MuCell, Ref};
+    ///
+    /// let c = MuCell::new((5, 'b'));
+    /// let b1: Ref<&(u32, char)> = c.borrow();
+    /// let b2: Ref<&u32> = Ref::map(b1, |t| &t.0);
+    /// assert_eq!(*b2, 5)
+    /// ```
+    #[inline]
+    pub fn map<U, F>(orig: Ref<'b, T>, f: F) -> Ref<'b, U>
+        where F: FnOnce(T) -> U
+    {
+        Ref {
+            _value: f(orig._value),
+            _borrow: orig._borrow,
+        }
+    }
+
+    /// Make a new `Ref` for a optional component of the borrowed data, e.g. an
+    /// enum variant.
+    ///
+    /// The `MuCell` is already immutably borrowed, so this cannot fail.
+    ///
+    /// This is an associated function that needs to be used as
+    /// `Ref::filter_map(...)`.  A method would interfere with methods of the
+    /// same name on the contents of a `MuCell` used through `Deref`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use mucell::{MuCell, Ref};
+    ///
+    /// let c = MuCell::new(Ok(5));
+    /// let b1: Ref<&Result<u32, ()>> = c.borrow();
+    /// let b2: Ref<&u32> = Ref::filter_map(b1, |o| o.as_ref().ok()).unwrap();
+    /// assert_eq!(*b2, 5)
+    /// ```
+    #[inline]
+    pub fn filter_map<U, F>(orig: Ref<'b, T>, f: F) -> Option<Ref<'b, U>>
+        where F: FnOnce(T) -> Option<U>
+    {
+        let borrow = orig._borrow;
+        f(orig._value).map(move |new| Ref {
+            _value: new,
+            _borrow: borrow,
+        })
+    }
+}
+
+unsafe impl<T: ?Sized> Send for MuCell<T> where T: Send {}
+
+impl<T: ?Sized + PartialEq> PartialEq for MuCell<T> {
     fn eq(&self, other: &MuCell<T>) -> bool {
         *self.borrow() == *other.borrow()
     }
 }
 
-impl<T: Eq> Eq for MuCell<T> { }
+impl<T: ?Sized + Eq> Eq for MuCell<T> { }
 
 impl<T: PartialOrd> PartialOrd for MuCell<T> {
     fn partial_cmp(&self, other: &MuCell<T>) -> Option<Ordering> {
@@ -225,98 +439,7 @@ impl<T> Hash for MuCell<T> where T: Hash {
     }
 }
 
-/// Create a new reference type to something inside the cell.
-///
-/// Why is this necesary? Because of the tracking of immutable references (`Ref<'a, T>` rather than
-/// `&'a T`), anything from the object owning the original cell wishing to return a reference to
-/// something inside the cell must go producing another such reference type like `Ref`, with its
-/// own `Deref` implementation and so forth. (This is the cost of efficient memory safety!)
-///
-/// Here’s an example of usage:
-///
-/// ```rust
-/// #[macro_use] extern crate mucell;
-/// use mucell::{MuCell, Ref};
-///
-/// struct Foo {
-///     bar: String,
-/// }
-///
-/// mucell_ref_type! {
-///     #[doc = "…"]
-///     struct BarRef<'a>(Foo),
-///     impl Deref -> str,
-///     data: &'a str = |x| x.bar.as_ref()
-/// }
-///
-/// fn pull_string_out(foo: &MuCell<Foo>) -> BarRef {
-///     // Maybe pretend we did something like `try_mutate` here.
-///
-///     // We would not be able to return foo.borrow().bar.as_ref()
-///     // here because the borrow() lifetime would be too short.
-///     // So we use our fancy new ref type!
-///     BarRef::from(foo)
-/// }
-///
-/// fn say(s: &str) {
-///     println!("The string is “{}”", s);
-/// }
-///
-/// fn demo(foo: &MuCell<Foo>) {
-///     say(&*pull_string_out(foo));
-/// }
-///
-/// fn main() {
-///     demo(&MuCell::new(Foo { bar: format!("panic") }));
-/// }
-/// ```
-///
-/// The `vector_munger` example demonstrates a more complex use case.
-#[macro_export]
-macro_rules! mucell_ref_type {
-    (
-        $(#[$attr:meta])*  // suggestions: doc, stability markers
-        struct $ref_name:ident<'a>($ty:ty),
-        impl Deref -> $deref:ty,
-        data: $data_ty:ty = |$data_ident:ident| $data_expr:expr
-    ) => {
-        /// An immutable reference to a `MuCell`. Dereference to get at the object.
-        $(#[$attr])*
-        pub struct $ref_name<'a> {
-            _parent: Ref<'a, $ty>,
-            _data: $data_ty,
-        }
-
-        impl<'a> $ref_name<'a> {
-            /// Construct a reference from the cell.
-            #[allow(trivial_casts)]  // The `as *const $ty` cast
-            fn from(cell: &'a MuCell<$ty>) -> $ref_name<'a> {
-                let parent = cell.borrow();
-                // This transmutation is to fix the lifetime of the reference so it is 'a rather
-                // than the block. Because we keep the parent around in the struct, it’ll be OK;
-                // even if the parent destructor is run before any data destructor and it does
-                // silly things with any references, because we’re not Sync it doesn’t matter if
-                // `borrows` is decremented early. We could just use `transmute(&*parent)` here,
-                // but for a macro it’s nice to avoid depending on std or core being in a
-                // particular place is of value. (Caring about efficiency? Unoptimised, this way is
-                // slightly less efficient, optimised both are noops.)
-                let $data_ident: &'a $ty = unsafe { &*(&*parent as *const $ty) };
-                let data = $data_expr;
-                $ref_name {
-                    _parent: parent,
-                    _data: data,
-                }
-            }
-        }
-
-        impl<'a> ::std::ops::Deref for $ref_name<'a> {
-            type Target = $deref;
-            fn deref<'b>(&'b self) -> &'b $deref {
-                &*self._data
-            }
-        }
-    }
-}
+// RefCell doesn’t have PartialOrd, Ord, Hash or fmt::*. TODO: why not?
 
 #[test]
 #[should_panic]

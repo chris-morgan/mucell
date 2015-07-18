@@ -1,4 +1,4 @@
-mucell 0.2.0
+mucell 0.3.0
 ============
 
 [![Build Status](https://travis-ci.org/chris-morgan/mucell.svg?branch=master)](https://travis-ci.org/chris-morgan/mucell)
@@ -68,9 +68,7 @@ assert_eq!(&cell.borrow()[], &[1, 2, 3, 4, 5, 6][]);
 ```
 
 Look at the examples in the repository for some slightly more practical (though still
-typically contrived) examples. Also see the
-`mucell_ref_type!` docs for an example of that part of the
-library.
+typically contrived) examples.
 
 Usage
 -----
@@ -78,6 +76,8 @@ Usage
 Cargo all the way. http://crates.io/crates/mucell
 
 This crate can be used with `#![no_std]` by enabling the `no_std` Cargo feature.
+
+`MuCell::new` can become a `const fn` instead of a `fn` on nightly by enabling the `const_fn` Cargo feature.
 
 Author
 ------

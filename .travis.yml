@@ -1,14 +1,12 @@
 language: rust
+sudo: false
 rust:
   - nightly
   - beta
-env:
-  global:
-    - secure: iH7/xrWdihEHIs0YW6mSz/ZhttrsseIGcywOiZSG/kEt2MfLa13iGSxX5yQ9kmEKwb/zdxxSMEfXvxEGDXaZ9xyD46EEEcmRpRWA7OefvG6OWm70CWFLDewvK/OGzT48c+lb+dh9+WVVxsLkOK9TFdZcWhX1vqeEKzuIFXA+BbY=
+  - stable
+  - 1.0.0
 script:
-  - if [[ "$(rustc --version)" =~ -(dev|nightly) ]]; then cargo test --features no_std; else ! cargo test --features no_std; fi
+  - if [[ "$TRAVIS_RUST_VERSION" == nightly ]]; then cargo test --features no_std; else ! cargo test --features no_std; fi
+  - if [[ "$TRAVIS_RUST_VERSION" == nightly ]]; then cargo test --features const_fn; else ! cargo test --features const_fn; fi
+  - if [[ "$TRAVIS_RUST_VERSION" == nightly ]]; then cargo test --features 'const_fn no_std'; else ! cargo test --features 'const_fn no_std'; fi
   - cargo test
-#  - cargo doc
-#after_script:
-#  - ln -s target/doc doc
-#  - curl http://www.rust-ci.org/artifacts/put?t=$RUSTCI_TOKEN | sh
