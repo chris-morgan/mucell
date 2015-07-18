@@ -83,6 +83,8 @@ extern crate std;
 #[cfg(feature = "no_std")]
 use std::marker::{Send, Sized};
 
+#[cfg(not(feature = "no_std"))]
+use std::borrow::Cow;
 use std::cell::{Cell, UnsafeCell};
 use std::clone::Clone;
 use std::cmp::{PartialEq, Eq, PartialOrd, Ord, Ordering};
@@ -329,6 +331,32 @@ impl<'b, T: 'static> Ref<'b, T> {
     #[inline]
     pub fn into_inner(self) -> T {
         self._value
+    }
+}
+
+#[cfg(not(feature = "no_std"))]
+impl<'b, T: ?Sized> Ref<'b, Cow<'b, T>> where T: ToOwned, T::Owned: 'static {
+    /// Extracts the owned data.
+    ///
+    /// Copies the data if it is not already owned.
+    ///
+    /// This code is precisely equivalent to `Ref::map(self, |cow| cow.into_owned()).into_inner()`
+    /// and is purely a convenience method because `Ref<Cow<T>>` is a common case.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mucell::{MuCell, Ref};
+    /// use std::borrow::Cow;
+    ///
+    /// let c = MuCell::new("foo");
+    ///
+    /// let r: Ref<Cow<str>> = Ref::map(c.borrow(), |s| Cow::from(*s));
+    /// let string: String = r.into_owned();
+    /// ```
+    #[inline]
+    pub fn into_owned(self) -> T::Owned {
+        Ref::map(self, |cow| cow.into_owned()).into_inner()
     }
 }
 

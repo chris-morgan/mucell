@@ -90,6 +90,12 @@ fn main() {
 
     // With another map call and an into_inner(), we can get the value out of
     // it without cloning it all if it’s already Cow::Owned. Efficiency, yay!
+    // As it happens, there is a method `into_owned` for suitable `Ref<Cow<T>>` instances, which
+    // this is, so we don’t need to write `Ref::map(a, |a| a.into_owned()).into_inner()` in full
+    // normally: we can just write `a.into_owned()`.
+    //
+    // But here in this example, we don’t do that, because it doesn’t work with the `no_std`
+    // Cargo feature, and so it’d break our Cargo tests if we used it…
+    // you, however, should definitely write `a.into_owned()` instead.
     let _munged: Vec<i32> = Ref::map(a, |a| a.into_owned()).into_inner();
-
 }
