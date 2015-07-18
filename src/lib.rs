@@ -103,40 +103,44 @@ pub struct MuCell<T: ?Sized> {
     value: UnsafeCell<T>,
 }
 
-impl<T> MuCell<T> {
-    /// Creates a `MuCell` containing `value`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mucell::MuCell;
-    ///
-    /// let c = MuCell::new(5);
-    /// ```
-    #[inline]
-    #[cfg(not(feature = "const_fn"))]
-    pub fn new(value: T) -> MuCell<T> {
-        MuCell {
-            value: UnsafeCell::new(value),
-            borrow: Cell::new(UNUSED),
+#[cfg(feature = "const_fn")]
+#[macro_use]
+mod _m {
+    macro_rules! const_fn {
+        ($(#[$m:meta])* pub const fn $name:ident($value:ident: $T:ty) -> $R:ty { $body:expr }) => {
+            $(#[$m])* pub const fn $name($value: $T) -> $R { $body }
         }
     }
+}
 
-    /// Creates a `MuCell` containing `value`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mucell::MuCell;
-    ///
-    /// let c = MuCell::new(5);
-    /// ```
-    #[inline]
-    #[cfg(feature = "const_fn")]
-    pub const fn new(value: T) -> MuCell<T> {
-        MuCell {
-            value: UnsafeCell::new(value),
-            borrow: Cell::new(UNUSED),
+#[cfg(not(feature = "const_fn"))]
+#[macro_use]
+mod _m {
+    macro_rules! const_fn {
+        ($(#[$m:meta])* pub const fn $name:ident($value:ident: $T:ty) -> $R:ty { $body:expr }) => {
+            $(#[$m])* pub fn $name($value: $T) -> $R { $body }
+        }
+    }
+}
+
+impl<T> MuCell<T> {
+    const_fn! {
+        #[doc = "
+            Creates a `MuCell` containing `value`.
+
+            # Examples
+
+            ```
+            use mucell::MuCell;
+
+            let c = MuCell::new(5);
+            ```"]
+        #[inline]
+        pub const fn new(value: T) -> MuCell<T> {
+            MuCell {
+                value: UnsafeCell::new(value),
+                borrow: Cell::new(UNUSED),
+            }
         }
     }
 
