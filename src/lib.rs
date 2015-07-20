@@ -544,13 +544,13 @@ fn test_try_mutate_in_try_mutate() {
 /// A demonstration of the subversion of memory safety using `map_unsafe`.
 #[test]
 fn unsafe_subversion_demo() {
-    let cell = MuCell::new(vec![0u8]);
-    let (borrow, mut x) = (cell.borrow(), None);
+    let cell = MuCell::new(0);
+    let (borrow, mut x) = (cell.borrow(), ::std::option::Option::None);
     unsafe {
-        Ref::map_unsafe(borrow, |a| { x = Some(&a[0]); a });
+        Ref::map_unsafe(borrow, |a| x = ::std::option::Option::Some(a));
     }
     let x = x.unwrap();
-    assert_eq!(x, &0);
-    assert!(cell.try_mutate(|n| n[0] += 1));
-    assert_eq!(x, &1);
+    assert_eq!(*x, 0);
+    assert!(cell.try_mutate(|n| *n += 1));
+    assert_eq!(*x, 1);
 }
