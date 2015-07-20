@@ -91,7 +91,7 @@ use std::cmp::{PartialEq, Eq, PartialOrd, Ord, Ordering};
 use std::default::Default;
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use std::ops::{Deref, Drop, FnOnce};
+use std::ops::{Deref, DerefMut, Drop, FnOnce};
 use std::option::Option;
 use std::result::Result;
 
@@ -288,6 +288,13 @@ impl<'b, T: Deref + 'b> Deref for Ref<'b, T> {
     #[inline]
     fn deref(&self) -> &T::Target {
         &*self._value
+    }
+}
+
+impl<'b, T: DerefMut + 'b> DerefMut for Ref<'b, T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut T::Target {
+        &mut *self._value
     }
 }
 
