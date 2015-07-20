@@ -376,6 +376,17 @@ impl<'b, T> Ref<'b, T> {
     /// A method would interfere with methods of the same name on the contents
     /// of a `MuCell` used through `Deref`.
     ///
+    /// # Memory unsafety
+    ///
+    /// This function is marked as unsafe because it is possible (though not the easiest
+    /// thing) to subvert memory safety by storing a reference to the wrapped value.
+    /// This is a deficiency which cannot be solved without Rust supporting HKT.
+    /// It’d need something like `where F: (for<'f> FnOnce(T) -> U where T: 'f, U: 'f)`.
+    ///
+    /// The only class of transformation functions that can structurally be known to be safe in
+    /// current Rust is those with no non-static environment; the `map` function embodies that
+    /// constraint and should be used where possible instead of this function.
+    ///
     /// # Example
     ///
     /// ```
@@ -387,13 +398,26 @@ impl<'b, T> Ref<'b, T> {
     /// assert_eq!(*b2, 5)
     /// ```
     #[inline]
-    pub fn map<U, F>(orig: Ref<'b, T>, f: F) -> Ref<'b, U>
+    pub unsafe fn map_unsafe<U, F>(orig: Ref<'b, T>, f: F) -> Ref<'b, U>
         where F: FnOnce(T) -> U
     {
         Ref {
             _value: f(orig._value),
             _borrow: orig._borrow,
         }
+    }
+
+    /// This is a safe version of `map_unsafe`,
+    /// imposing the constraint that `F` is `'static`.
+    ///
+    /// This is the only way to make it safe in a pre-HKT world:
+    /// by preventing the closure from capturing any non-static environment.
+    /// Anything beyond that will require caution to ensure safety.
+    #[inline]
+    pub fn map<U, F>(orig: Ref<'b, T>, f: F) -> Ref<'b, U>
+        where F: FnOnce(T) -> U + 'static
+    {
+        unsafe { Ref::map_unsafe(orig, f) }
     }
 
     /// Make a new `Ref` for a optional component of the borrowed data, e.g. an
@@ -404,6 +428,17 @@ impl<'b, T> Ref<'b, T> {
     /// This is an associated function that needs to be used as
     /// `Ref::filter_map(...)`.  A method would interfere with methods of the
     /// same name on the contents of a `MuCell` used through `Deref`.
+    ///
+    /// # Memory unsafety
+    ///
+    /// This function is marked as unsafe because it is possible (though not the easiest
+    /// thing) to subvert memory safety by storing a reference to the wrapped value.
+    /// This is a deficiency which cannot be solved without Rust supporting HKT.
+    /// It’d need something like `where F: (for<'f> FnOnce(T) -> Option<U> where T: 'f, U: 'f)`.
+    ///
+    /// The only class of transformation functions that can structurally be known to be safe in
+    /// current Rust is those with no non-static environment; the `map` function embodies that
+    /// constraint and should be used where possible instead of this function.
     ///
     /// # Example
     ///
@@ -416,7 +451,7 @@ impl<'b, T> Ref<'b, T> {
     /// assert_eq!(*b2, 5)
     /// ```
     #[inline]
-    pub fn filter_map<U, F>(orig: Ref<'b, T>, f: F) -> Option<Ref<'b, U>>
+    pub unsafe fn filter_map_unsafe<U, F>(orig: Ref<'b, T>, f: F) -> Option<Ref<'b, U>>
         where F: FnOnce(T) -> Option<U>
     {
         let borrow = orig._borrow;
@@ -424,6 +459,19 @@ impl<'b, T> Ref<'b, T> {
             _value: new,
             _borrow: borrow,
         })
+    }
+
+    /// This is a safe version of `filter_map_unsafe`,
+    /// imposing the constraint that `F` is `'static`.
+    ///
+    /// This is the only way to make it safe in a pre-HKT world:
+    /// by preventing the closure from capturing any non-static environment.
+    /// Anything beyond that will require caution to ensure safety.
+    #[inline]
+    pub fn filter_map<U, F>(orig: Ref<'b, T>, f: F) -> Option<Ref<'b, U>>
+        where F: FnOnce(T) -> Option<U> + 'static
+    {
+        unsafe { Ref::filter_map_unsafe(orig, f) }
     }
 }
 
@@ -491,4 +539,18 @@ fn test_borrow_in_try_mutate() {
 fn test_try_mutate_in_try_mutate() {
     let a = MuCell::new(());
     assert!(a.try_mutate(|_| assert!(!a.try_mutate(|_| unreachable!()))));
+}
+
+/// A demonstration of the subversion of memory safety using `map_unsafe`.
+#[test]
+fn unsafe_subversion_demo() {
+    let cell = MuCell::new(vec![0u8]);
+    let (borrow, mut x) = (cell.borrow(), None);
+    unsafe {
+        Ref::map_unsafe(borrow, |a| { x = Some(&a[0]); a });
+    }
+    let x = x.unwrap();
+    assert_eq!(x, &0);
+    assert!(cell.try_mutate(|n| n[0] += 1));
+    assert_eq!(x, &1);
 }
