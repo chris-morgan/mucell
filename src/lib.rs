@@ -64,36 +64,19 @@
 //! typically contrived) examples.
 
 #![cfg_attr(feature = "no_std", no_std)]
-#![cfg_attr(feature = "no_std", feature(no_std, core, collections))]
 #![cfg_attr(feature = "const_fn", feature(const_fn))]
 #![warn(bad_style, unused, missing_docs)]
 
-#[cfg(feature = "no_std")]
-#[macro_use]
-extern crate core;
-#[cfg(all(feature = "no_std", not(test)))]
-extern crate core as std;
-// ^^^ Ick! Alas, core’s panic macro currently hardcodes ::core rather than using $crate.
-#[cfg(feature = "no_std")]
-extern crate collections;
-
-#[cfg(all(feature = "no_std", test))]
-extern crate std;
-
-#[cfg(feature = "no_std")]
-use std::marker::{Send, Sized};
+#[cfg(not(feature = "no_std"))]
+extern crate std as core;
 
 #[cfg(not(feature = "no_std"))]
 use std::borrow::Cow;
-use std::cell::{Cell, UnsafeCell};
-use std::clone::Clone;
-use std::cmp::{PartialEq, Eq, PartialOrd, Ord, Ordering};
-use std::default::Default;
-use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::ops::{Deref, DerefMut, Drop, FnOnce};
-use std::option::Option;
-use std::result::Result;
+use core::cell::{Cell, UnsafeCell};
+use core::cmp::Ordering;
+use core::fmt;
+use core::hash::{Hash, Hasher};
+use core::ops::{Deref, DerefMut};
 
 type BorrowFlag = usize;
 const UNUSED: BorrowFlag = 0;
@@ -545,12 +528,11 @@ fn test_try_mutate_in_try_mutate() {
 #[test]
 fn unsafe_subversion_demo() {
     let cell = MuCell::new(0);
-    let (borrow, mut x) = (cell.borrow(), ::std::option::Option::None);
+    let (borrow, mut x) = (cell.borrow(), Option::None);
     unsafe {
-        Ref::map_unsafe(borrow, |a| x = ::std::option::Option::Some(a));
+        Ref::map_unsafe(borrow, |a| x = Option::Some(a));
     }
-    let x = x.unwrap();
-    assert_eq!(*x, 0);
+    assert_eq!(x, Option::Some(&0));
     assert!(cell.try_mutate(|n| *n += 1));
-    assert_eq!(*x, 1);
+    assert_eq!(x, Option::Some(&1));
 }
